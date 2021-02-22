@@ -40,12 +40,9 @@ func main() {
 
 	// Mux route handling with gorilla/mux
 	router := mux.NewRouter()
-
-	amw := authentication.AuthenticationMiddleware{make(map[string]string)}
-	amw.Populate()
-	router.Use(amw.Middleware)
 	// Get Router
 	getRouter := router.Methods(http.MethodGet).Subrouter()
+	getRouter.HandleFunc("/ubivius/callback", authentication.AuthCallback)
 	getRouter.HandleFunc("/products", productHandler.GetProducts)
 	getRouter.HandleFunc("/products/{id:[0-9]+}", productHandler.GetProductByID)
 
@@ -62,6 +59,9 @@ func main() {
 	// Delete router
 	deleteRouter := router.Methods(http.MethodDelete).Subrouter()
 	deleteRouter.HandleFunc("/products/{id:[0-9]+}", productHandler.Delete)
+
+	amw := authentication.AuthenticationMiddleware{}
+	router.Use(amw.Middleware)
 
 	// Server setup
 	server := &http.Server{

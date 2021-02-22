@@ -1,4 +1,4 @@
-package Authentication
+package authentication
 
 import (
 	"context"
@@ -13,15 +13,6 @@ import (
 
 // Define our struct
 type AuthenticationMiddleware struct {
-	tokenUsers map[string]string
-}
-
-// Initialize it somewhere
-func (amw *AuthenticationMiddleware) Populate() {
-	amw.tokenUsers["00000000"] = "user0"
-	amw.tokenUsers["aaaaaaaa"] = "userA"
-	amw.tokenUsers["05f717e5"] = "randomUser"
-	amw.tokenUsers["deadbeef"] = "user0"
 }
 
 func AuthConfig() (oauth2Config oauth2.Config, state string, verifier *oidc.IDTokenVerifier, ctx context.Context) {
@@ -57,12 +48,13 @@ func AuthConfig() (oauth2Config oauth2.Config, state string, verifier *oidc.IDTo
 	return oauth2Config, state, verifier, ctx
 }
 
-// Middleware function, which will be called for each request
-func (amw *AuthenticationMiddleware) NamePlaceholder(next http.Handler) http.Handler {
+func (amw *AuthenticationMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		oauth2Config, state, verifier, ctx := AuthConfig()
 		rawAccessToken := r.Header.Get("Authorization")
+		log.Println("rawAccessToken: " + rawAccessToken)
 		if rawAccessToken == "" {
+			log.Println("No access token provided")
 			http.Redirect(w, r, oauth2Config.AuthCodeURL(state), http.StatusFound)
 			return
 		}
@@ -79,62 +71,65 @@ func (amw *AuthenticationMiddleware) NamePlaceholder(next http.Handler) http.Han
 			http.Redirect(w, r, oauth2Config.AuthCodeURL(state), http.StatusFound)
 			return
 		}
-
-		log.Printf("Authenticated user")
+		log.Println("serving http")
 		next.ServeHTTP(w, r)
-	})
-}
-
-func (amw *AuthenticationMiddleware) Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		oauth2Config, state, verifier, ctx := AuthConfig()
-		if r.URL.Query().Get("state") != state {
-			log.Println("state did not match")
-			http.Error(w, "state did not match", http.StatusBadRequest)
-			return
-		}
-
-		oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
+		val, err := w.Write([]byte("hello world"))
 		if err != nil {
-			log.Println("Failed to exchange token")
-			http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		rawIDToken, ok := oauth2Token.Extra("id_token").(string)
-		if !ok {
-			log.Println("No id_token field in oauth2 token.")
-			http.Error(w, "No id_token field in oauth2 token.", http.StatusInternalServerError)
-			return
-		}
-		idToken, err := verifier.Verify(ctx, rawIDToken)
-		if err != nil {
-			log.Println("Auth Failed to verify ID Token")
-			http.Error(w, "Failed to verify ID Token: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		resp := struct {
-			OAuth2Token   *oauth2.Token
-			IDTokenClaims *json.RawMessage // ID Token payload is just JSON.
-		}{oauth2Token, new(json.RawMessage)}
-
-		if err := idToken.Claims(&resp.IDTokenClaims); err != nil {
-			log.Println("Auth idToken claim error")
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		data, err := json.MarshalIndent(resp, "", "    ")
-		if err != nil {
-			log.Println("Auth marshal indent error")
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		val, err := w.Write(data)
-		if err != nil {
-			log.Println("Auth write data error")
+			log.Println("error writing hello world")
 			http.Error(w, err.Error(), val)
 			return
 		}
 	})
+}
+
+func AuthCallback(responseWriter http.ResponseWriter, request *http.Request) {
+	oauth2Config, state, verifier, ctx := AuthConfig()
+	if request.URL.Query().Get("state") != state {
+		log.Println("state did not match")
+		http.Error(responseWriter, "state did not match", http.StatusBadRequest)
+		return
+	}
+
+	oauth2Token, err := oauth2Config.Exchange(ctx, request.URL.Query().Get("code"))
+	if err != nil {
+		log.Println("Failed to exchange token")
+		http.Error(responseWriter, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+	if !ok {
+		log.Println("No id_token field in oauth2 token.")
+		http.Error(responseWriter, "No id_token field in oauth2 token.", http.StatusInternalServerError)
+		return
+	}
+	idToken, err := verifier.Verify(ctx, rawIDToken)
+	if err != nil {
+		log.Println("Auth Failed to verify ID Token")
+		http.Error(responseWriter, "Failed to verify ID Token: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := struct {
+		OAuth2Token   *oauth2.Token
+		IDTokenClaims *json.RawMessage // ID Token payload is just JSON.
+	}{oauth2Token, new(json.RawMessage)}
+
+	if err := idToken.Claims(&resp.IDTokenClaims); err != nil {
+		log.Println("Auth idToken claim error")
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data, err := json.MarshalIndent(resp, "", "    ")
+	if err != nil {
+		log.Println("Auth marshal indent error")
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	val, err := responseWriter.Write(data)
+	if err != nil {
+		log.Println("Auth write data error")
+		http.Error(responseWriter, err.Error(), val)
+		return
+	}
 }
