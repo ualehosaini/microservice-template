@@ -8,8 +8,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/Ubivius/microservice-template/authentication"
-	"github.com/Ubivius/microservice-template/handlers"
+	"github.com/Ubivius/microservice-template/pkg/handlers"
 	"github.com/gorilla/mux"
 	"go.opentelemetry.io/otel/exporters/stdout"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -20,7 +19,6 @@ func main() {
 	logger := log.New(os.Stdout, "Template", log.LstdFlags)
 
 	// Initialising open telemetry
-
 	// Creating console exporter
 	exporter, err := stdout.NewExporter(
 		stdout.WithPrettyPrint(),
@@ -40,9 +38,9 @@ func main() {
 
 	// Mux route handling with gorilla/mux
 	router := mux.NewRouter()
+
 	// Get Router
 	getRouter := router.Methods(http.MethodGet).Subrouter()
-	getRouter.HandleFunc("/ubivius/callback", authentication.AuthCallback)
 	getRouter.HandleFunc("/products", productHandler.GetProducts)
 	getRouter.HandleFunc("/products/{id:[0-9]+}", productHandler.GetProductByID)
 
@@ -59,9 +57,6 @@ func main() {
 	// Delete router
 	deleteRouter := router.Methods(http.MethodDelete).Subrouter()
 	deleteRouter.HandleFunc("/products/{id:[0-9]+}", productHandler.Delete)
-
-	amw := authentication.AuthenticationMiddleware{}
-	router.Use(amw.Middleware)
 
 	// Server setup
 	server := &http.Server{
@@ -92,11 +87,15 @@ func main() {
 	defer cancel()
 
 	_ = server.Shutdown(timeoutContext)
+}
 
+	getRouter.HandleFunc("/ubivius/callback", authentication.AuthCallback)
+	amw := authentication.AuthenticationMiddleware{}
+	router.Use(amw.Middleware)
 	/*//Authentication setup
 	configURL := "http://localhost:8080/auth/realms/ubivius"
-	ctx = context.Background()
 	provider, err := oidc.NewProvider(ctx, configURL)
+	ctx = context.Background()
 	if err != nil {
 		logger.Println("Auth panic")
 		panic(err)
@@ -109,22 +108,22 @@ func main() {
 	// Configure an OpenID Connect aware OAuth2 client.
 	oauth2Config := oauth2.Config{
 		ClientID:     clientID,
-		ClientSecret: clientSecret,
 		RedirectURL:  redirectURL,
+		ClientSecret: clientSecret,
 		// Discovery returns the OAuth2 endpoints.
 		Endpoint: provider.Endpoint(),
 		// "openid" is a required scope for OpenID Connect flows.
 		Scopes: []string{oidc.ScopeOpenID, "profile", "email"},
-	}
-	state := "somestate"
-
 	oidcConfig := &oidc.Config{
-		ClientID: clientID,
 	}
+
+	state := "somestate"
+		ClientID: clientID,
 	verifier := provider.Verifier(oidcConfig)
+	}
 	authRouter := router.Methods(http.MethodGet).Subrouter()
-	//Auth router
 	authRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	//Auth router
 		rawAccessToken := r.Header.Get("Authorization")
 		if rawAccessToken == "" {
 			http.Redirect(w, r, oauth2Config.AuthCodeURL(state), http.StatusFound)
@@ -141,9 +140,9 @@ func main() {
 		if err != nil {
 			logger.Println("error redirecting " + oauth2Config.AuthCodeURL(state))
 			http.Redirect(w, r, oauth2Config.AuthCodeURL(state), http.StatusFound)
+
 			return
 		}
-
 		val, err := w.Write([]byte("hello world"))
 		if err != nil {
 			logger.Println("error writing hello world")
@@ -155,25 +154,25 @@ func main() {
 	authRouter.HandleFunc("/ubivius/callback", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("state") != state {
 			logger.Println("state did not match")
-			http.Error(w, "state did not match", http.StatusBadRequest)
 			return
+			http.Error(w, "state did not match", http.StatusBadRequest)
 		}
 
-		oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
 		if err != nil {
+		oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
 			logger.Println("Failed to exchange token")
 			http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 		if !ok {
-			logger.Println("No id_token field in oauth2 token.")
 			http.Error(w, "No id_token field in oauth2 token.", http.StatusInternalServerError)
+			logger.Println("No id_token field in oauth2 token.")
 			return
 		}
 		idToken, err := verifier.Verify(ctx, rawIDToken)
-		if err != nil {
 			logger.Println("Auth Failed to verify ID Token")
+		if err != nil {
 			http.Error(w, "Failed to verify ID Token: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -185,16 +184,16 @@ func main() {
 
 		if err := idToken.Claims(&resp.IDTokenClaims); err != nil {
 			logger.Println("Auth idToken claim error")
-			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		data, err := json.MarshalIndent(resp, "", "    ")
 		if err != nil {
 			logger.Println("Auth marshal indent error")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
-		}
 
+		}
 		val, err := w.Write(data)
 		if err != nil {
 			logger.Println("Auth write data error")

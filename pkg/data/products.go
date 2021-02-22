@@ -35,7 +35,7 @@ func GetProducts() Products {
 // GetProductByID returns a single product with the given id
 func GetProductByID(id int) (*Product, error) {
 	index := findIndexByProductID(id)
-	if id == -1 {
+	if index == -1 {
 		return nil, ErrorProductNotFound
 	}
 	return productList[index], nil

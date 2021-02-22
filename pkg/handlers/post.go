@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/Ubivius/microservice-template/data"
+	"github.com/Ubivius/microservice-template/pkg/data"
 )
 
 // AddProduct creates a new product from the received JSON
@@ -12,4 +12,5 @@ func (productHandler *ProductsHandler) AddProduct(responseWriter http.ResponseWr
 	product := request.Context().Value(KeyProduct{}).(*data.Product)
 
 	data.AddProduct(product)
+	responseWriter.WriteHeader(http.StatusNoContent)
 }

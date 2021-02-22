@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/Ubivius/microservice-template/data"
+	"github.com/Ubivius/microservice-template/pkg/data"
 )
 
 // Delete a product with specified id from the database
@@ -20,7 +20,7 @@ func (productHandler *ProductsHandler) Delete(responseWriter http.ResponseWriter
 
 	if err != nil {
 		productHandler.logger.Println("[ERROR] deleting product", err)
-		http.Error(responseWriter, "Erro deleting poduct", http.StatusInternalServerError)
+		http.Error(responseWriter, "Error deleting poduct", http.StatusInternalServerError)
 		return
 	}
 
